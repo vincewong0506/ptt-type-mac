@@ -68,6 +68,10 @@ final class AppModel: ObservableObject {
     var onRequestOpenSettings: (() -> Void)?
 
     let bleClient: BLEVoiceClient
+    /// Live readout of process memory + CPU + Metal GPU footprint. Owns
+    /// its own sampling lifecycle, auto-pauses when the app is not
+    /// active. Settings → Performance panel is the only consumer.
+    let perfMonitor = PerformanceMonitor()
     private let sbcDecoder = SBCFrameDecoder()
     private let wavRecorder = WAVFileRecorder()
     private let asrClient = LocalASRClient()

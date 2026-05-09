@@ -17,13 +17,15 @@ struct ContentView: View {
             .padding()
             .navigationSplitViewColumnWidth(min: 280, ideal: 340)
         } detail: {
-            VStack(alignment: .leading, spacing: 16) {
-                modelLoadPanel
-                promptPanel
-                pastePanel
-                Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    modelLoadPanel
+                    promptPanel
+                    pastePanel
+                    PerformancePanel(monitor: model.perfMonitor)
+                }
+                .padding()
             }
-            .padding()
         }
     }
 
@@ -490,6 +492,74 @@ private struct ASRPromptPanel: View {
             .background(bg)
             .foregroundStyle(fg)
             .clipShape(Capsule())
+    }
+}
+
+// MARK: - PerformancePanel
+
+private struct PerformancePanel: View {
+    @ObservedObject var monitor: PerformanceMonitor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("Performance")
+                    .font(.headline)
+                if !monitor.isSampling {
+                    Text("paused (app inactive)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+                GridRow {
+                    label("Memory")
+                    Text(formatBytes(monitor.memoryFootprintBytes))
+                        .font(.system(.body, design: .monospaced))
+                    captionLabel("Process resident incl. MLX weights (Apple Silicon unified memory)")
+                }
+                GridRow {
+                    label("CPU")
+                    Text(formatPercent(monitor.cpuPercent))
+                        .font(.system(.body, design: .monospaced))
+                    captionLabel("Sum across all cores; up to ~800% on M-series Pro")
+                }
+                GridRow {
+                    label("GPU")
+                    Text(formatBytes(monitor.gpuAllocatedBytes))
+                        .font(.system(.body, design: .monospaced))
+                    captionLabel("Metal device-wide allocation (system, not per-app)")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text).font(.caption).foregroundStyle(.secondary)
+    }
+
+    private func captionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func formatBytes(_ bytes: UInt64) -> String {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useGB, .useMB]
+        f.countStyle = .memory
+        return f.string(fromByteCount: Int64(bytes))
+    }
+
+    private func formatPercent(_ percent: Double) -> String {
+        if percent < 1 {
+            return String(format: "%.1f%%", percent)
+        }
+        return String(format: "%.0f%%", percent)
     }
 }
 
