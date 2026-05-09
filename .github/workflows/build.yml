@@ -30,7 +30,14 @@ concurrency:
 jobs:
   build:
     name: swift build (.app)
-    runs-on: macos-latest
+    # Pinned to macos-26 because Package.swift requires `.macOS(.v26)` and
+    # `swift-tools-version: 6.2`, both of which need Tahoe-era SDK + Swift
+    # 6.2. `macos-latest` currently aliases to macos-15 (Sequoia / Swift
+    # 6.1) and trips two failures: package resolve refuses with "Swift
+    # tools version 6.2.0 but the installed version is 6.1.0", and once
+    # past that the FoundationModels framework references in
+    # Sources/PTTMacVoiceCore/TranscriptCleaner.swift would fail to link.
+    runs-on: macos-26
     timeout-minutes: 30
 
     steps:
