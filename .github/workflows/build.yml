@@ -1,0 +1,76 @@
+name: Build
+
+# Smoke build on every push to main and on every PR. Exercises the
+# canonical release-build path (`scripts/build-ptt-voice-app.sh`) so
+# regressions in the .app pipeline (entitlements, metallib bundling,
+# resource catalog) are caught here, not at the user's first launch.
+#
+# Apple Silicon only — speech-swift's Float16 casts don't compile under
+# x86_64 macOS, and MLX needs a real Metal-capable GPU at runtime
+# (compile time is fine on any Mac, but stay arm64 for parity with the
+# binaries we actually ship).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'THIRD_PARTY_LICENSES.md'
+      - '.github/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: swift build (.app)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain info
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          xcodebuild -showsdks | grep -i macos || true
+
+      # Cache SwiftPM resolved checkouts + the .build directory so a
+      # follow-up CI run on the same Package.resolved hits the cache.
+      # Big saver: speech-swift + mlx-swift + swift-transformers + the
+      # whole Apple Swift package universe is several gigabytes after a
+      # fresh resolve.
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            .swiftpm
+          key: spm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build .app via canonical release script
+        run: bash scripts/build-ptt-voice-app.sh
+
+      - name: Show built app
+        run: |
+          ls -lh "dist/PTT Voice.app/Contents/MacOS/" || true
+          codesign -d --entitlements - "dist/PTT Voice.app" 2>&1 | head -20 || true
+
+      - name: Upload .app artifact (debug)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: dist/xcodebuild.log
+          retention-days: 7
