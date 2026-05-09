@@ -25,6 +25,12 @@ final class PerformanceMonitor: ObservableObject {
     @Published private(set) var gpuAllocatedBytes: UInt64 = 0
     @Published private(set) var isSampling: Bool = false
 
+    /// Last `historyMaxSamples` memory readings, oldest → newest. Used by
+    /// the Settings Performance panel's sparkline. Not reset on
+    /// pause/resume — keeps continuity across brief switch-aways.
+    @Published private(set) var memoryHistory: [UInt64] = []
+    static let historyMaxSamples = 60
+
     private static let sampleInterval: TimeInterval = 1.0
     private let metalDevice = MTLCreateSystemDefaultDevice()
     private var sampleTimer: Timer?
@@ -99,6 +105,10 @@ final class PerformanceMonitor: ObservableObject {
     private func sample() {
         if let rusage = currentRUsage() {
             memoryFootprintBytes = rusage.ri_phys_footprint
+            memoryHistory.append(rusage.ri_phys_footprint)
+            if memoryHistory.count > Self.historyMaxSamples {
+                memoryHistory.removeFirst(memoryHistory.count - Self.historyMaxSamples)
+            }
 
             let cpuTimeNs = rusage.ri_user_time + rusage.ri_system_time
             let now = Date()

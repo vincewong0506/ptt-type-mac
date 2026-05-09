@@ -228,18 +228,30 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     // hint where toggling would surprise the user.
     private func showSettingsWindow() {
         if model.isExpanded, let debugWindow {
-            debugWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            bringWindowToFront(debugWindow)
             return
         }
         showDebugWindow()
         model.setDebugWindowVisible(true)
     }
 
+    /// Bring an existing window forward as reliably as possible from a
+    /// `.accessory` app. Plain `NSApp.activate(ignoringOtherApps:)` is
+    /// deprecated on macOS 14+ and the system frequently denies it for
+    /// accessory apps, leaving the window stuck behind whatever app the
+    /// user was just in. The combination below — `orderFrontRegardless()`
+    /// before activation, then the modern `activate(ignoringOtherApps:)`
+    /// (kept until we drop pre-14 entirely) — is the documented escape
+    /// hatch and works consistently on macOS 26.
+    private func bringWindowToFront(_ window: NSWindow) {
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private func showDebugWindow() {
         if let debugWindow {
-            debugWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            bringWindowToFront(debugWindow)
             return
         }
 
@@ -264,9 +276,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         debugWindow = window
+        bringWindowToFront(window)
     }
 }
 

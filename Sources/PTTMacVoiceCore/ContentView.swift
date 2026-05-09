@@ -5,24 +5,26 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(alignment: .leading, spacing: 12) {
-                header
-                deviceList
-                Divider()
-                audioInputPanel
-                Divider()
-                permissionsPanel
-                Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    deviceList
+                    Divider()
+                    audioInputPanel
+                    Divider()
+                    permissionsPanel
+                    Divider()
+                    PerformancePanel(monitor: model.perfMonitor)
+                }
+                .padding()
             }
-            .padding()
-            .navigationSplitViewColumnWidth(min: 280, ideal: 340)
+            .navigationSplitViewColumnWidth(min: 300, ideal: 340)
         } detail: {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     modelLoadPanel
                     promptPanel
                     pastePanel
-                    PerformancePanel(monitor: model.perfMonitor)
                 }
                 .padding()
             }
@@ -43,9 +45,16 @@ struct ContentView: View {
     }
 
     private var deviceList: some View {
+        // Capped height so the surrounding panels (Audio Input,
+        // Permissions, Performance) sit close to the device list rather
+        // than getting pushed to the bottom of the column. Without a cap
+        // the List greedily expands to whatever vertical space is
+        // available, leaving everything below it floating in dead space.
+        // 200 fits 2-3 rows comfortably; longer lists scroll inside.
         List(model.devices) { device in
             DeviceRow(device: device)
         }
+        .frame(minHeight: 100, maxHeight: 200)
     }
 
     private var modelLoadPanel: some View {
@@ -506,46 +515,44 @@ private struct PerformancePanel: View {
                 Text("Performance")
                     .font(.headline)
                 if !monitor.isSampling {
-                    Text("paused (app inactive)")
+                    Text("paused")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
-                GridRow {
-                    label("Memory")
-                    Text(formatBytes(monitor.memoryFootprintBytes))
-                        .font(.system(.body, design: .monospaced))
-                    captionLabel("Process resident incl. MLX weights (Apple Silicon unified memory)")
-                }
-                GridRow {
-                    label("CPU")
-                    Text(formatPercent(monitor.cpuPercent))
-                        .font(.system(.body, design: .monospaced))
-                    captionLabel("Sum across all cores; up to ~800% on M-series Pro")
-                }
-                GridRow {
-                    label("GPU")
-                    Text(formatBytes(monitor.gpuAllocatedBytes))
-                        .font(.system(.body, design: .monospaced))
-                    captionLabel("Metal device-wide allocation (system, not per-app)")
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                row("Memory",
+                    value: formatBytes(monitor.memoryFootprintBytes),
+                    caption: "process resident, incl. MLX weights")
+                MemorySparkline(samples: monitor.memoryHistory)
+                    .frame(height: 28)
+                    .padding(.horizontal, 2)
+                row("CPU",
+                    value: formatPercent(monitor.cpuPercent),
+                    caption: "sum across all cores")
+                row("GPU",
+                    value: formatBytes(monitor.gpuAllocatedBytes),
+                    caption: "Metal device-wide, not per-app")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func label(_ text: String) -> some View {
-        Text(text).font(.caption).foregroundStyle(.secondary)
-    }
-
-    private func captionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
+    private func row(_ name: String, value: String, caption: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(name)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+            Text(value)
+                .font(.system(.body, design: .monospaced))
+            Spacer(minLength: 4)
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
     }
 
     private func formatBytes(_ bytes: UInt64) -> String {
@@ -560,6 +567,45 @@ private struct PerformancePanel: View {
             return String(format: "%.1f%%", percent)
         }
         return String(format: "%.0f%%", percent)
+    }
+}
+
+private struct MemorySparkline: View {
+    let samples: [UInt64]
+
+    var body: some View {
+        GeometryReader { geo in
+            // Auto-scale to the max value observed in the window — gives
+            // visual amplitude even when the absolute number doesn't move
+            // much between samples (idle App). Clamp the floor so a flat
+            // run of identical values still renders at the bottom of the
+            // strip rather than wherever the line got drawn last.
+            let cap = max(samples.max() ?? 1, 1)
+            let floor = (samples.min() ?? 0)
+            let range = max(cap - floor, 1)
+            let xStep = geo.size.width / CGFloat(max(samples.count - 1, 1))
+
+            ZStack {
+                // Faint baseline so an empty/short history still has shape.
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.10))
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                if samples.count >= 2 {
+                    Path { path in
+                        for (i, v) in samples.enumerated() {
+                            let x = CGFloat(i) * xStep
+                            let normalized = Double(v - floor) / Double(range)
+                            let y = geo.size.height * (1 - CGFloat(normalized))
+                            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                            else { path.addLine(to: CGPoint(x: x, y: y)) }
+                        }
+                    }
+                    .stroke(Color.accentColor.opacity(0.85),
+                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                }
+            }
+        }
     }
 }
 
