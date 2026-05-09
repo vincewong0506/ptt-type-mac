@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundleDisplayName</key>
+    <string>PTT Voice</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>PTT Voice uses Bluetooth to discover and connect to the ESP32 voice device.</string>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>PTT Voice uses Bluetooth to discover and connect to the ESP32 voice device.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>PTT Voice records from the Mac microphone when you switch the input source to "系统麦克风" in Settings, and only while you hold the PTT key (Control). The recording is transcribed locally on-device and is not sent to any server.</string>
+</dict>
+</plist>

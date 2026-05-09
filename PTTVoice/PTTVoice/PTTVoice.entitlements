@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        App Sandbox is intentionally OFF: the app talks to a local HTTP server
+        (Qwen3 ASR) AND drives Cmd+V into other apps via the Accessibility API.
+        Sandbox would block the latter, so we ship a non-sandboxed app and let
+        the user grant Accessibility once via System Settings.
+
+        Hardened runtime is enabled by Xcode automatically. Two extra
+        entitlements are needed for the system-microphone PTT mode:
+
+        - device.audio-input: lets a hardened-runtime app open the input node
+          on AVAudioEngine. Without this, AVCaptureDevice.requestAccess may
+          not even surface the system prompt, and the app won't appear in
+          System Settings → Privacy & Security → Microphone.
+    -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,17 @@
+.build/
+.swiftpm/
+DerivedData/
+# `xcuserdata/` (no leading wildcard) matches Xcode's per-user state
+# directories at any depth — they're named e.g. `vince.xcuserdatad`
+# inside an `xcuserdata/` parent. The previous `*.xcuserdata/` pattern
+# only matched directories ending in `.xcuserdata`, which Xcode never
+# uses, so per-user UI state (window positions, breakpoints, recent
+# files, macOS short username in the path) leaked into commits.
+xcuserdata/
+
+# Output of scripts/build-ptt-voice-app.sh — produced .app bundle plus
+# intermediate Xcode derived data and the build log.
+dist/
+
+# macOS noise
+.DS_Store
