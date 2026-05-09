@@ -129,28 +129,43 @@ final class PerformanceMonitor: ObservableObject {
         return Double(info.numer) / Double(info.denom)
     }()
 
-    /// Bridges proc_pid_rusage's `void *` buffer signature to a typed
-    /// rusage_info_v4 fill. Returns nil if the syscall fails (shouldn't
-    /// happen for our own pid on a healthy system).
+    /// Fill `rusage_info_v4` for our own pid, or nil on failure.
     ///
-    /// Pinned to v4 — not v6, not "current" — on purpose. v4 ships in
-    /// every macOS since 10.13, has a stable layout, and contains the
-    /// three fields we actually read (`ri_phys_footprint`,
-    /// `ri_user_time`, `ri_system_time`). Earlier versions of this code
-    /// used v6 and crashed at runtime with __stack_chk_fail because the
-    /// kernel wrote sizeof(kernel-side v6) bytes past the end of Swift's
-    /// imported rusage_info_v6 stack buffer — Swift's importer and the
-    /// kernel disagreed on the struct's tail. Using a smaller, fully
-    /// stable version sidesteps the entire SDK-vs-kernel size race.
+    /// Bridging note (load-bearing): proc_pid_rusage's documented C
+    /// signature is `int proc_pid_rusage(int pid, int flavor,
+    /// rusage_info_t *buffer)` where `rusage_info_t` typedefs to
+    /// `void *`. Read literally that's a `void **` — i.e. a pointer to
+    /// a pointer to the destination — but XNU's actual implementation
+    /// (`copyout(&ri, buffer, size)` in kern_resource.c) treats
+    /// `buffer` as the destination address directly. The `*` in the
+    /// signature is a historical type-erasure quirk; the kernel writes
+    /// sizeof(flavor-struct) bytes starting at whatever pointer value
+    /// the caller passed.
+    ///
+    /// Earlier versions of this code took the documented type
+    /// literally and added an extra level of indirection
+    /// (`var opaque = &info; proc_pid_rusage(pid, flavor, &opaque)`)
+    /// which made the kernel write 240 bytes starting at the 8-byte
+    /// stack slot for `opaque`, blowing through the stack canary by
+    /// 232 bytes. The crash showed up as __stack_chk_fail at the
+    /// proc_pid_rusage line, regardless of which flavor (v4, v6, …)
+    /// we asked for.
+    ///
+    /// The right bridge is: take `&info` and rebind it to
+    /// `rusage_info_t?` so the value passed to the syscall is the
+    /// struct's address, not the address of a local pointer variable.
+    ///
+    /// Pinned to v4 (not v6 / not "current") because v4 has been
+    /// stable since macOS 10.13 and carries every field we read
+    /// (`ri_phys_footprint`, `ri_user_time`, `ri_system_time`); newer
+    /// flavors only add fields we don't surface.
     private func currentRUsage() -> rusage_info_v4? {
         var info = rusage_info_v4()
         let pid = ProcessInfo.processInfo.processIdentifier
         let result: Int32 = withUnsafeMutablePointer(to: &info) { typedPtr in
-            // rusage_info_t is `void *` in C; Swift imports the buffer
-            // arg as UnsafeMutablePointer<rusage_info_t?>. We hand it a
-            // local raw-pointer optional that points at our struct.
-            var opaque: rusage_info_t? = UnsafeMutableRawPointer(typedPtr)
-            return proc_pid_rusage(pid, RUSAGE_INFO_V4, &opaque)
+            typedPtr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { reboundPtr in
+                proc_pid_rusage(pid, RUSAGE_INFO_V4, reboundPtr)
+            }
         }
         guard result == 0 else {
             logger.error("proc_pid_rusage failed: \(result)")
