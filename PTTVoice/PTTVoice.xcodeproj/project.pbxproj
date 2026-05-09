@@ -102,7 +102,7 @@
 			mainGroup = 61CC846E2FA8FA8E003BFA91;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				61CC848A2FA8FB59003BFA91 /* XCLocalSwiftPackageReference "../../macos-ble-voice" */,
+				61CC848A2FA8FB59003BFA91 /* XCLocalSwiftPackageReference "../" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 61CC84782FA8FA8E003BFA91 /* Products */;
@@ -346,9 +346,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		61CC848A2FA8FB59003BFA91 /* XCLocalSwiftPackageReference "../../macos-ble-voice" */ = {
+		61CC848A2FA8FB59003BFA91 /* XCLocalSwiftPackageReference "../" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../macos-ble-voice";
+			relativePath = "../";
 		};
 /* End XCLocalSwiftPackageReference section */
 
