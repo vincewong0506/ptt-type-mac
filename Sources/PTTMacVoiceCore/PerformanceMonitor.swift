@@ -130,17 +130,27 @@ final class PerformanceMonitor: ObservableObject {
     }()
 
     /// Bridges proc_pid_rusage's `void *` buffer signature to a typed
-    /// rusage_info_v6 fill. Returns nil if the syscall fails (shouldn't
+    /// rusage_info_v4 fill. Returns nil if the syscall fails (shouldn't
     /// happen for our own pid on a healthy system).
-    private func currentRUsage() -> rusage_info_v6? {
-        var info = rusage_info_v6()
+    ///
+    /// Pinned to v4 — not v6, not "current" — on purpose. v4 ships in
+    /// every macOS since 10.13, has a stable layout, and contains the
+    /// three fields we actually read (`ri_phys_footprint`,
+    /// `ri_user_time`, `ri_system_time`). Earlier versions of this code
+    /// used v6 and crashed at runtime with __stack_chk_fail because the
+    /// kernel wrote sizeof(kernel-side v6) bytes past the end of Swift's
+    /// imported rusage_info_v6 stack buffer — Swift's importer and the
+    /// kernel disagreed on the struct's tail. Using a smaller, fully
+    /// stable version sidesteps the entire SDK-vs-kernel size race.
+    private func currentRUsage() -> rusage_info_v4? {
+        var info = rusage_info_v4()
         let pid = ProcessInfo.processInfo.processIdentifier
         let result: Int32 = withUnsafeMutablePointer(to: &info) { typedPtr in
-            // Re-cast through Optional<UnsafeMutableRawPointer> because
-            // rusage_info_t is `void *` in C, which Swift imports as
-            // `UnsafeMutablePointer<rusage_info_t?>` for the buffer arg.
+            // rusage_info_t is `void *` in C; Swift imports the buffer
+            // arg as UnsafeMutablePointer<rusage_info_t?>. We hand it a
+            // local raw-pointer optional that points at our struct.
             var opaque: rusage_info_t? = UnsafeMutableRawPointer(typedPtr)
-            return proc_pid_rusage(pid, RUSAGE_INFO_V6, &opaque)
+            return proc_pid_rusage(pid, RUSAGE_INFO_V4, &opaque)
         }
         guard result == 0 else {
             logger.error("proc_pid_rusage failed: \(result)")
