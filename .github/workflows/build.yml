@@ -11,16 +11,19 @@ name: Build
 # binaries we actually ship).
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - 'THIRD_PARTY_LICENSES.md'
-      - '.github/**'
+  # Solo-dev OSS workflow: don't fire CI on every personal push to main.
+  # Run only when:
+  #   - a contributor opens or updates a PR (so external patches are
+  #     validated)
+  #   - a release tag (`v*`) is pushed (so the published build is known
+  #     to compile end-to-end)
+  #   - someone explicitly clicks "Run workflow" or runs
+  #     `gh workflow run build.yml` (smoke check on demand)
   pull_request:
     branches: [main]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
